@@ -37,8 +37,11 @@ release:
 	   [ -n "$$(eval echo \"\$$$$v\")" ] || { echo "$$v is not set (see env.mk.example)"; exit 1; }; \
 	 done; \
 	 [ -f "$$KEYSTORE" ] || { echo "Keystore not found: $$KEYSTORE"; exit 1; }
+	@rm -f app/build/outputs/apk/release/*.apk
 	$(GRADLE) assembleRelease
-	@echo "Release APK: $$(ls app/build/outputs/apk/release/*.apk | head -n1)"
+	@[ "$$(ls app/build/outputs/apk/release/*.apk | wc -l)" = 1 ] || { echo "Expected exactly one release APK"; exit 1; }
+	@$(PYTHON) $(_DEVKIT)/scripts/check_apk_version.py "$$(ls app/build/outputs/apk/release/*.apk)"
+	@echo "Release APK: $$(ls app/build/outputs/apk/release/*.apk)"
 
 _publish-check:
 	@[ -z "$$(git status --porcelain)" ] || { echo "Uncommitted changes: commit first"; exit 1; }
@@ -47,7 +50,11 @@ _publish-check:
 
 ## publish: Build the signed release APK and upload it to a GitHub release tagged v<versionName>
 publish: _publish-check release
-	@VERSION=$$($(PYTHON) $(_DEVKIT)/scripts/bump_version.py | cut -d' ' -f1); 	 [ -f "$(RELEASE_APK)" ] || { echo "No release APK found"; exit 1; }; 	 echo "Publishing v$$VERSION: $(RELEASE_APK)"; 	 gh release create "v$$VERSION" "$(RELEASE_APK)" --target "$$(git rev-parse HEAD)" \
+	@VERSION=$$($(PYTHON) $(_DEVKIT)/scripts/bump_version.py | cut -d' ' -f1); \
+	 APK=$$(ls app/build/outputs/apk/release/*.apk); \
+	 $(PYTHON) $(_DEVKIT)/scripts/check_apk_version.py "$$APK" || exit 1; \
+	 echo "Publishing v$$VERSION: $$APK"; \
+	 gh release create "v$$VERSION" "$$APK" --target "$$(git rev-parse HEAD)" \
 	   --title "$(PKG) v$$VERSION" --generate-notes
 
 ## install: Push the debug APK to a connected device / emulator
