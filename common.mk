@@ -20,10 +20,12 @@ ADB      ?= adb
 PYTHON   ?= python3
 # Prefer the project's Gradle wrapper, fall back to a system Gradle.
 GRADLE   ?= $(if $(wildcard ./gradlew),./gradlew,gradle)
-APK      ?= app/build/outputs/apk/debug/app-debug.apk
-RELEASE_APK ?= app/build/outputs/apk/release/app-release.apk
+# Whatever APK the build produced (the project may rename it, e.g. to include the version).
+# $(shell) runs when used, unlike $(wildcard), which caches directory contents from before the build.
+APK         ?= $(shell ls app/build/outputs/apk/debug/*.apk 2>/dev/null | head -n1)
+RELEASE_APK ?= $(shell ls app/build/outputs/apk/release/*.apk 2>/dev/null | head -n1)
 
-.PHONY: debug release install deploy run phone logcat logcat-save bump clean help
+.PHONY: debug release publish install deploy run phone logcat logcat-save bump clean help
 
 ## debug: Build a debug APK
 debug:
@@ -36,7 +38,17 @@ release:
 	 done; \
 	 [ -f "$$KEYSTORE" ] || { echo "Keystore not found: $$KEYSTORE"; exit 1; }
 	$(GRADLE) assembleRelease
-	@echo "Release APK: $(RELEASE_APK)"
+	@echo "Release APK: $$(ls app/build/outputs/apk/release/*.apk | head -n1)"
+
+_publish-check:
+	@[ -z "$$(git status --porcelain)" ] || { echo "Uncommitted changes: commit first"; exit 1; }
+	@git rev-parse '@{u}' >/dev/null 2>&1 || { echo "Branch has no upstream: git push -u origin <branch> first"; exit 1; }
+	@[ -z "$$(git log '@{u}..' --oneline)" ] || { echo "Unpushed commits: push first"; exit 1; }
+
+## publish: Build the signed release APK and upload it to a GitHub release tagged v<versionName>
+publish: _publish-check release
+	@VERSION=$$($(PYTHON) $(_DEVKIT)/scripts/bump_version.py | cut -d' ' -f1); 	 [ -f "$(RELEASE_APK)" ] || { echo "No release APK found"; exit 1; }; 	 echo "Publishing v$$VERSION: $(RELEASE_APK)"; 	 gh release create "v$$VERSION" "$(RELEASE_APK)" --target "$$(git rev-parse HEAD)" \
+	   --title "$(PKG) v$$VERSION" --generate-notes
 
 ## install: Push the debug APK to a connected device / emulator
 install:
