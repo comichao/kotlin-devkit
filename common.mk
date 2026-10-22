@@ -21,12 +21,22 @@ PYTHON   ?= python3
 # Prefer the project's Gradle wrapper, fall back to a system Gradle.
 GRADLE   ?= $(if $(wildcard ./gradlew),./gradlew,gradle)
 APK      ?= app/build/outputs/apk/debug/app-debug.apk
+RELEASE_APK ?= app/build/outputs/apk/release/app-release.apk
 
-.PHONY: debug install deploy run phone logcat logcat-save bump clean help
+.PHONY: debug release install deploy run phone logcat logcat-save bump clean help
 
 ## debug: Build a debug APK
 debug:
 	$(GRADLE) assembleDebug
+
+## release: Build a signed release APK (needs KEYSTORE, KEYSTORE_PASSWORD, KEY_PASSWORD, KEY_ALIAS)
+release:
+	@for v in KEYSTORE KEYSTORE_PASSWORD KEY_PASSWORD; do \
+	   [ -n "$$(eval echo \"\$$$$v\")" ] || { echo "$$v is not set (see env.mk.example)"; exit 1; }; \
+	 done; \
+	 [ -f "$$KEYSTORE" ] || { echo "Keystore not found: $$KEYSTORE"; exit 1; }
+	$(GRADLE) assembleRelease
+	@echo "Release APK: $(RELEASE_APK)"
 
 ## install: Push the debug APK to a connected device / emulator
 install:

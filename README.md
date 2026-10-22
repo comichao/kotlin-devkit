@@ -20,6 +20,7 @@ include kotlin-devkit/common.mk
 
 ```
 make debug       Build a debug APK (./gradlew or gradle assembleDebug)
+make release     Build a signed release APK (see below)
 make install     adb install -r the APK
 make deploy      debug + install
 make run         Launch the app
@@ -34,4 +35,23 @@ make help
 Variables: `PKG` (required), `ACTIVITY` (default `.MainActivity`), `GRADLE`, `ADB`, `APK`.
 Machine-specific settings go in a git-ignored `env.mk` (see `env.mk.example`).
 
-Release signing and Play upload are not covered yet.
+## Release
+
+`make release` runs `assembleRelease` after checking that `KEYSTORE`,
+`KEYSTORE_PASSWORD` and `KEY_PASSWORD` are set (put them in `env.mk`, see
+`env.mk.example`). The project's `app/build.gradle.kts` must read them for its
+release signing config:
+
+```kotlin
+signingConfigs {
+    create("release") {
+        storeFile = System.getenv("KEYSTORE")?.let { file(it) }
+        storePassword = System.getenv("KEYSTORE_PASSWORD")
+        keyAlias = System.getenv("KEY_ALIAS") ?: "release"
+        keyPassword = System.getenv("KEY_PASSWORD")
+    }
+}
+buildTypes { release { signingConfig = signingConfigs.getByName("release") } }
+```
+
+Play upload is not covered yet.
