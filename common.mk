@@ -53,8 +53,10 @@ publish: _publish-check release
 	@VERSION=$$($(PYTHON) $(_DEVKIT)/scripts/bump_version.py | cut -d' ' -f1); \
 	 APK=$$(ls app/build/outputs/apk/release/*.apk); \
 	 $(PYTHON) $(_DEVKIT)/scripts/check_apk_version.py "$$APK" || exit 1; \
+	 SUMS=app/build/outputs/apk/release/SHA256SUMS; \
+	 (cd "$$(dirname "$$APK")" && sha256sum "$$(basename "$$APK")") > "$$SUMS"; \
 	 echo "Publishing v$$VERSION: $$APK"; \
-	 gh release create "v$$VERSION" "$$APK" --target "$$(git rev-parse HEAD)" \
+	 gh release create "v$$VERSION" "$$APK" "$$SUMS" --target "$$(git rev-parse HEAD)" \
 	   --title "$(PKG) v$$VERSION" --generate-notes
 
 ## install: Push the debug APK to a connected device / emulator
